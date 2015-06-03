@@ -93,9 +93,12 @@ static task_t *task_new(tasktype_t type)
 	t->total_written = 0;
 	t->peer_list = NULL;
 
-	strcpy(t->filename, "");
-	strcpy(t->disk_filename, "");
-
+	//strcpy(t->filename, "");
+	//strcpy(t->disk_filename, "");
+	// instead of strcpy, use memset() to fill block of memory to 0
+	memset(t->filename, 0, FILENAMESIZ);
+	memset(t->disk_filename, 0, FILENAMESIZ);
+	
 	return t;
 }
 
@@ -477,8 +480,17 @@ task_t *start_download(task_t *tracker_task, const char *filename)
 		error("* Error while allocating task");
 		goto exit;
 	}
-	strcpy(t->filename, filename);
 
+	if (strlen(filename) > FILENAMESIZ)
+	  {
+	    error("* Name too long");
+	    goto exit;
+	  }
+	
+	//strcpy(t->filename, filename);
+	strncpy(t->filename, filename, FILENAMESIZ - 1);
+	t->filename[FILENAMESIZ - 1] = '\0';
+	
 	// add peers
 	s1 = tracker_task->buf;
 	while ((s2 = memchr(s1, '\n', (tracker_task->buf + messagepos) - s1))) {
@@ -534,7 +546,11 @@ static void task_download(task_t *t, task_t *tracker_task)
 	// at all.
 	for (i = 0; i < 50; i++) {
 		if (i == 0)
-			strcpy(t->disk_filename, t->filename);
+		  {
+		    //strcpy(t->disk_filename, t->filename);
+		    strncpy(t->disk_filename, t->filename, FILENAMESIZ - 1);
+		    t->disk_filename[FILENAMESIZ - 1] = '\0';
+		  }
 		else
 			sprintf(t->disk_filename, "%s~%d~", t->filename, i);
 		t->disk_fd = open(t->disk_filename,
@@ -652,13 +668,21 @@ static void task_upload(task_t *t)
 
 	// check if file is in current working directory
 	char currentdir[PATH_MAX];
-
+	char pathname[PATH_MAX];
+	
 	if (!getcwd(currentdir, PATH_MAX))
 	  {
 	    error("* Current working directory not valid");
 	    goto exit;
 	  }
 
+	// checks if it is a link 
+	if (!realpath(t->filename, pathname))
+	  {
+	    error("* File path not valid.");
+	    goto exit;
+	  }
+	  
 	// strncmp returns 0 if equal, 1 if not
 	// if t->filename has the current working directory's path in its
 	// name, then should be in the current working directory
