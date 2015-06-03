@@ -22,6 +22,7 @@
 #include <limits.h>
 #include "md5.h"
 #include "osp2p.h"
+#include <sys/wait.h>
 
 int evil_mode;			// nonzero iff this peer should behave badly
 
@@ -758,6 +759,7 @@ int main(int argc, char *argv[])
 	listen_task = start_listen();
 	register_files(tracker_task, myalias);
 
+	int count = 0;
 	// First, download files named on command line.
 	for (; argc > 1 && !evil_mode; argc--, argv++)
 	  {
@@ -806,12 +808,12 @@ int main(int argc, char *argv[])
 	      }
 	  }
 	return 0;
-}
+
 
 
 	// Then accept connections from other peers and upload files to them!
 	while ((t = task_listen(listen_task)))
-		task_upload(t);
-
+	  task_upload(t);
+	
 	return 0;
 }
