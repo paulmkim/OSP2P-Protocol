@@ -38,7 +38,7 @@ static int listen_port;
 
 #define TASKBUFSIZ	65536	// Size of task_t::buf
 #define FILENAMESIZ	256	// Size of task_t::filename
-#define MAXFILESIZE     65536
+#define MAXFILESIZ      TASKBUFSIZ * 256
 typedef enum tasktype {		// Which type of connection is this?
 	TASK_TRACKER,		// => Tracker connection
 	TASK_PEER_LISTEN,	// => Listens for upload requests
@@ -519,6 +519,13 @@ static void task_download(task_t *t, task_t *tracker_task)
 	assert((!t || t->type == TASK_DOWNLOAD)
 	       && tracker_task->type == TASK_TRACKER);
 
+	// SOS: check filename size
+	if (strlen(t->filename) > FILENAMESIZ)
+	  {
+	    error("* Name too long");
+	    goto try_again;
+	  }
+	
 	// Quit if no peers, and skip this peer
 	if (!t || !t->peer_list) {
 		error("* No peers are willing to serve '%s'\n",
@@ -582,10 +589,10 @@ static void task_download(task_t *t, task_t *tracker_task)
 			break;
 
 		// check if exceeded the max file size
-		if (t->total_written > MAXFILESIZE)
+		if (t->total_written > MAXFILESIZ)
 		  {
 		    error("* Exceeded max file size");
-		    break;
+		    goto try_again;
 		  }
 		
 		ret = write_from_taskbuf(t->disk_fd, t);
@@ -680,6 +687,13 @@ static void task_upload(task_t *t)
 	}
 	t->head = t->tail = 0;
 
+	// TODO: check filesize name
+	if (strlen(t->filename) > FILENAMESIZ)
+	  {
+	    error("* Name too long");
+	    goto exit;
+	  }
+	
 	// check if file is in current working directory
 	char currentdir[PATH_MAX];
 	char pathname[PATH_MAX];
