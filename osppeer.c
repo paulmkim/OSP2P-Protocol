@@ -659,10 +659,10 @@ static void task_upload(task_t *t)
 	    goto exit;
 	  }
 
-	// strncp returns 0 if equal, 1 if not
+	// strncmp returns 0 if equal, 1 if not
 	// if t->filename has the current working directory's path in its
 	// name, then should be in the current working directory
-	if (strncp(currentdir, t->filename, strlen(currentdir))
+	if (strncmp(currentdir, t->filename, strlen(currentdir)))
 	  {
 	    error("* File not in current working directory");
 	    goto exit;
