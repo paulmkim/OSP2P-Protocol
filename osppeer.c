@@ -35,7 +35,7 @@ static int listen_port;
  * a bounded buffer that simplifies reading from and writing to peers.
  */
 
-#define TASKBUFSIZ	4096	// Size of task_t::buf
+#define TASKBUFSIZ	16384	// Size of task_t::buf
 #define FILENAMESIZ	256	// Size of task_t::filename
 
 typedef enum tasktype {		// Which type of connection is this?
@@ -759,9 +759,55 @@ int main(int argc, char *argv[])
 	register_files(tracker_task, myalias);
 
 	// First, download files named on command line.
-	for (; argc > 1; argc--, argv++)
+	for (; argc > 1 && !evil_mode; argc--, argv++)
+	  {
 		if ((t = start_download(tracker_task, argv[1])))
+		  {
+		    pid_t pid;
+		    if ((pid = fork()) < 0)
+		      {
+			error("failed to fork");
+			continue;
+		      }
+		    if (pid == 0)
+		      {
 			task_download(t, tracker_task);
+			exit(0);
+		      }
+		    else
+		      {
+			count++;
+			task_free(t);
+		      }
+		  }
+	  }
+	while(count > 0)
+	  {
+	    waitpid(-1,NULL,0);
+	    count--;
+	  }
+	while((t=task_listen(listen_task)))
+	  {
+	    pid_t pid;
+	    waitpid(-1,NULL,WNOHANG);
+	    if ((pid = fork()) <0)
+	      {
+		error("failed to fork");
+		continue;
+	      }
+	    else if (pid == 0)
+	      {
+		task_upload(t);
+		exit(0);
+	      }
+	    else
+	      {
+		task_free(t);
+	      }
+	  }
+	return 0;
+}
+
 
 	// Then accept connections from other peers and upload files to them!
 	while ((t = task_listen(listen_task)))
