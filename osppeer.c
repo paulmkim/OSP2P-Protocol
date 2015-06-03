@@ -650,6 +650,24 @@ static void task_upload(task_t *t)
 	}
 	t->head = t->tail = 0;
 
+	// check if file is in current working directory
+	char currentdir[PATH_MAX];
+
+	if (!getcwd(currentdir, PATH_MAX))
+	  {
+	    error("* Current working directory not valid");
+	    goto exit;
+	  }
+
+	// strncp returns 0 if equal, 1 if not
+	// if t->filename has the current working directory's path in its
+	// name, then should be in the current working directory
+	if (strncp(currentdir, t->filename, strlen(currentdir))
+	  {
+	    error("* File not in current working directory");
+	    goto exit;
+	  }
+	
 	t->disk_fd = open(t->filename, O_RDONLY);
 	if (t->disk_fd == -1) {
 		error("* Cannot open file %s", t->filename);
@@ -768,7 +786,7 @@ int main(int argc, char *argv[])
 		    pid_t pid;
 		    if ((pid = fork()) < 0)
 		      {
-			error("failed to fork");
+			error("* Failed to fork");
 			continue;
 		      }
 		    if (pid == 0)
@@ -794,7 +812,7 @@ int main(int argc, char *argv[])
 	    waitpid(-1,NULL,WNOHANG);
 	    if ((pid = fork()) <0)
 	      {
-		error("failed to fork");
+		error("* Failed to fork");
 		continue;
 	      }
 	    else if (pid == 0)
