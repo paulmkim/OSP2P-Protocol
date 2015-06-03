@@ -1,4 +1,4 @@
-4739056 // -*- mode: c++ -*-
+// -*- mode: c++ -*-
 #define _BSD_EXTENSION
 #include <stdlib.h>
 #include <string.h>
@@ -735,6 +735,7 @@ static void task_upload(task_t *t)
 	}
 
 	message("* Transferring file %s\n", t->filename);
+
 	// message for attack #2
 	if (evil_mode == 2)
 	  message("* Attacking with disk overrun upload");
@@ -763,7 +764,7 @@ static void task_upload(task_t *t)
 			/* End of file */
 			//break;
 		  {
-		    // if attack #3, reset file pointer to beginning of file
+		    // if attack #2, reset file pointer to beginning of file
 		    // so it keeps writing
 		    if (evil_mode == 2)
 		      lseek(t->disk_fd, 0, 0);
@@ -783,7 +784,7 @@ static void task_upload(task_t *t)
 //	The main loop!
 int main(int argc, char *argv[])
 {
-	task_t *tracker_task, *listen_task, *t;
+  task_t *tracker_task, *listen_task, *t, *prev_task;
 	struct in_addr tracker_addr;
 	int tracker_port;
 	char *s;
@@ -856,22 +857,25 @@ int main(int argc, char *argv[])
 	tracker_task = start_tracker(tracker_addr, tracker_port);
 	listen_task = start_listen();
 	register_files(tracker_task, myalias);
-
-
+	prev_task = NULL;
+	
 	if (evil_mode == 1)
 	  {
+	    pid_t pid;
 	    char name[9];
 	    int i;
 	    for (i = 1; i <= 3; i++)
 	      {
 		switch(i){
 		   case 1:
-		     name = "cat1.jpg";
+		     strncpy(name, "cat1.jpg", 8);
 		     break;
 		   case 2:
-		     name = "cat2.jpg";
+		     strncpy(name, "cat1.jpg", 8);
+		     break;
 		   case 3:
-		     name = "cat3.jpg";
+		     strncpy(name, "cat1.jpg", 8);
+		     break;
 		}    
 		name[8] = '\0';
 		if ((t= start_download(tracker_task, name)))
@@ -919,6 +923,13 @@ int main(int argc, char *argv[])
 	  }
 	while((t=task_listen(listen_task)))
 	  {
+	    // if same peer requests repeatedly, deny it
+	    if (prev_task && prev_task->peer_fd == t->peer_fd)
+	      {
+		error("* Repeated requests from same peer");
+		prev_task = NULL;
+		continue;
+	      }
 	    pid_t pid;
 	    waitpid(-1,NULL,WNOHANG);
 	    if ((pid = fork()) <0)
