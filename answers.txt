@@ -25,14 +25,39 @@ Email: paul.m.kim321@gmail.com
 # EXERCISE 1: What method you used to make your peer download and upload
 #    files in parallel?  (~1-3 sentences)
 
+We downloaded/uploaded files in parallel by forking multiple processes withing
+two different loops. The first loop downloaded all files in parallel w/ one
+process per file while also incrementing a counter. Then, the second loop waited
+for all downloads to complete (using), then uploaded to all other peers in
+parallel using forking again.
+
 # EXERCISE 2A: What conditions did you find and fix that would have
 #    triggered a buffer overrun bug?  (~1-3 sentences each)
 
-# EXERCISE 2B: What other robustness problems did you fix?  (~1-3 sentences
+A buffer overrun was caused by using a filename that was larger than
+FILENAMESIZ. We fixed this problem by limiting the length of filename to
+FILENAMESIZ and added a null byte at the end of the filename to terminate it.
+
+# Exercise 2B: What other robustness problems did you fix?  (~1-3 sentences
 #    each)
+
+1. Replaced strcpy() w/ memset() to zero out the filename in task_new()
+2. Checked the filename length in download/upload to make sure it's smaller than
+FILENAMESIZ
+3. Limited download size to prevent extremely large files from taking up the
+entire disk space (by comparing to MAXFILESIZ)
+4. Ensure that requested files are within the current working directory
+5. If the same peer repeated requests the same file, we ignore that request
 
 # EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why
 #    are they attacks?  (~3-10 sentences each)
+
+1. Caused a buffer overflow by using strncpy and writing over three times the
+size of memory allocated for filename. This will wrote over other variable's
+memory.
+2. Caused a disk overrun by repeatedly uploading data to the peer. To do this,
+we just reset the file pointer to point to the beginning of the file whenever it
+reached the end of file to ocntinuously upload data.
 
 # Extra credit problems
 #Extra credit problem: none
