@@ -38,7 +38,7 @@ static int listen_port;
 
 #define TASKBUFSIZ	16384	// Size of task_t::buf
 #define FILENAMESIZ	256	// Size of task_t::filename
-
+#define MAXFILESIZE     65536
 typedef enum tasktype {		// Which type of connection is this?
 	TASK_TRACKER,		// => Tracker connection
 	TASK_PEER_LISTEN,	// => Listens for upload requests
@@ -581,6 +581,13 @@ static void task_download(task_t *t, task_t *tracker_task)
 			/* End of file */
 			break;
 
+		// check if exceeded our max file size
+		if (t->total_written > MAXFILESIZE)
+		  {
+		    error("* Exceeded max file size");
+		    goto try_again;
+		  }
+		
 		ret = write_from_taskbuf(t->disk_fd, t);
 		if (ret == TBUF_ERROR) {
 			error("* Disk write error");
@@ -659,6 +666,13 @@ static void task_upload(task_t *t)
 			break;
 	}
 
+	// make sure filename isn't too long w/ space for "get" and "osp2p" 
+	if (strlen(t->buf) > FILENAMESIZ + 12)
+	  {
+	    error("* Name too long");
+	    goto exit;
+	  }
+	
 	assert(t->head == 0);
 	if (osp2p_snscanf(t->buf, t->tail, "GET %s OSP2P\n", t->filename) < 0) {
 		error("* Odd request %.*s\n", t->tail, t->buf);
@@ -686,9 +700,9 @@ static void task_upload(task_t *t)
 	// strncmp returns 0 if equal, 1 if not
 	// if t->filename has the current working directory's path in its
 	// name, then should be in the current working directory
-	if (strncmp(currentdir, t->filename, strlen(currentdir)))
+	if (strncmp(currentdir, pathname, strlen(currentdir)))
 	  {
-	    error("* File not in current working directory");
+	    error("* File %s not in current working directory", t->filename);
 	    goto exit;
 	  }
 	
