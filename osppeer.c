@@ -23,8 +23,11 @@
 #include "md5.h"
 #include "osp2p.h"
 #include <sys/wait.h>
+#include <stdio.h>
 
 int evil_mode;			// nonzero iff this peer should behave badly
+int encrypt_mode;
+char password[] = "1234";
 
 static struct in_addr listen_addr;	// Define listening endpoint
 static int listen_port;
@@ -39,6 +42,8 @@ static int listen_port;
 #define TASKBUFSIZ	65536	// Size of task_t::buf
 #define FILENAMESIZ	256	// Size of task_t::filename
 #define MAXFILESIZ      TASKBUFSIZ * 256
+#define MAXPASSKEYSIZ   32
+#define ENCRYPTIONKEY   500
 typedef enum tasktype {		// Which type of connection is this?
 	TASK_TRACKER,		// => Tracker connection
 	TASK_PEER_LISTEN,	// => Listens for upload requests
@@ -73,6 +78,7 @@ typedef struct task {
 				// function initializes this list;
 				// task_pop_peer() removes peers from it, one
 				// at a time, if a peer misbehaves.
+        char password[MAXPASSKEYSIZ];
 } task_t;
 
 
@@ -545,6 +551,28 @@ static void task_download(task_t *t, task_t *tracker_task)
 		error("* Cannot connect to peer: %s\n", strerror(errno));
 		goto try_again;
 	}
+
+	int value = 0;
+	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
+	if (encrypt_mode != 0)
+	  {
+	    char temp[MAXPASSKEYSIZ] = "";
+	    while(strcmp(password, temp) != 0) //while the password is wrong
+	      {
+		printf("Enter encryption key to download files: ");
+		scanf("%s", temp);
+		if (strcmp(password, temp) != 0) //wrong password
+		  {
+		    printf("Incorrect encryption key. Please try again\n");
+		  }
+	      }
+	    printf("Encryption key verified\n"); //right password
+	    value = 1;
+	  }
+		    
+
+	
+
 	if (evil_mode == 1)
 	  {
 	    message("* Attacking with evil_mode 1: buffer overflow \n");
@@ -552,6 +580,7 @@ static void task_download(task_t *t, task_t *tracker_task)
 	    memset(largeFile, 1, FILENAMESIZ*3);
 	    osp2p_writef(t->peer_fd, "GET %s OSP2P\n", largeFile);
 	  }
+	
 	
 	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
 
@@ -614,6 +643,15 @@ static void task_download(task_t *t, task_t *tracker_task)
 	if (t->total_written > 0) {
 		message("* Downloaded '%s' was %lu bytes long\n",
 			t->disk_filename, (unsigned long) t->total_written);
+
+		if (value == 1) //want to decrypt now
+		  {
+		    if (!encrypt(t->filename))
+		      {
+			error("* Failed to decrypt");
+			goto try_again;
+		      }
+		  }
 		// Inform the tracker that we now have the file,
 		// and can serve it to others!  (But ignore tracker errors.)
 		if (strcmp(t->filename, t->disk_filename) == 0) {
@@ -727,6 +765,19 @@ static void task_upload(task_t *t)
 	    error("* File %s not in current working directory", t->filename);
 	    goto exit;
 	  }
+
+	if (encrypt_mode != 0)
+	  {
+	    if(!encrypt(t->filename))
+	      {
+		error("* encrypt failed");
+		goto exit;
+	      }
+	  
+
+
+	  }
+	
 	
 	t->disk_fd = open(t->filename, O_RDONLY);
 	if (t->disk_fd == -1) {
@@ -779,6 +830,41 @@ static void task_upload(task_t *t)
 	task_free(t);
 }
 
+int encrypt(char* filename)
+{
+  FILE *original;
+  FILE *encrypted;
+
+  int temp;
+  //r+: read and update
+  if ((original = fopen(filename, "r+")) == NULL)
+    {
+      error("* Could not open file %s to read", filename);
+      return 0;
+    }
+  //a: append
+  if ((encrypted = fopen("temperary_encrypt", "a")) == NULL)
+    {
+      error("* Could not open temperary file");
+    }
+
+  while (1)
+    {
+      temp = fgetc(original);
+      if (temp == EOF)
+	break;
+      temp = temp^ENCRYPTIONKEY; //encrypt the byte using xor
+
+      if (fputc(temp, encrypted) == EOF)
+	{
+	  error("* Failed to write in encrypted file");
+	  return 0;
+	}
+    }
+  remove(filename);
+  rename("temperary_encrypt", filename);
+  return 1;
+}
 
 // main(argc, argv)
 //	The main loop!
@@ -844,14 +930,24 @@ int main(int argc, char *argv[])
 		evil_mode = 1;
 		--argc, ++argv;
 		goto argprocess;
-	} else if (argc >= 2 && (strcmp(argv[1], "--help") == 0
+	}
+	else if (argc >= 2 && strcmp(argv[1], "-e") == 0) {
+	 
+	        encrypt_mode = 1;
+	        --argc, ++argv;
+	        goto argprocess;
+	}
+	else if (argc >= 2 && (strcmp(argv[1], "--help") == 0
 				 || strcmp(argv[1], "-h") == 0)) {
 		printf("Usage: osppeer [-tADDR:PORT | -tPORT] [-dDIR] [-b]\n"
 "Options: -tADDR:PORT  Set tracker address and/or port.\n"
 "         -dDIR        Upload and download files from directory DIR.\n"
-"         -b[MODE]     Evil mode!!!!!!!!\n");
+"         -b[MODE]     Evil mode!!!!!!!!\n"
+"         -e           Encryption mode\n");
 		exit(0);
 	}
+	 
+	
 
 	// Connect to the tracker and register our files.
 	tracker_task = start_tracker(tracker_addr, tracker_port);
@@ -892,34 +988,41 @@ int main(int argc, char *argv[])
 		  }
 	      }
 	  }
+
+	char temp[4];
+
+	
 	int count = 0;
 	// First, download files named on command line.
 	for (; argc > 1 && !evil_mode; argc--, argv++)
 	  {
-		if ((t = start_download(tracker_task, argv[1])))
+	    if ((t = start_download(tracker_task, argv[1])))
+	      {
+		task_download(t, tracker_task);
+		/*		pid_t pid;
+		if ((pid = fork()) < 0)
 		  {
-		    pid_t pid;
-		    if ((pid = fork()) < 0)
-		      {
-			error("* Failed to fork");
-			continue;
-		      }
-		    if (pid == 0)
-		      {
-			task_download(t, tracker_task);
-			exit(0);
-		      }
-		    else
-		      {
-			count++;
-			task_free(t);
-		      }
+		    error("* Failed to fork");
+		    continue;
+		  }
+		if (pid == 0)
+		  {
+		    task_download(t, tracker_task);
+		    exit(0);
+		  }
+		else
+		  {
+		    count++;
+		    task_free(t);
+		  }
 		  }
 	  }
 	while(count > 0)
 	  {
 	    waitpid(-1,NULL,0);
 	    count--;
+	    }*/
+	      }
 	  }
 	while((t=task_listen(listen_task)))
 	  {
@@ -957,3 +1060,4 @@ int main(int argc, char *argv[])
 	
 	return 0;
 }
+
