@@ -557,6 +557,7 @@ static void task_download(task_t *t, task_t *tracker_task)
 	if (encrypt_mode != 0)
 	  {
 	    char temp[MAXPASSKEYSIZ] = "";
+	    //int num_wrong = 0;
 	    while(strcmp(password, temp) != 0) //while the password is wrong
 	      {
 		printf("Enter encryption key to download files: ");
@@ -564,6 +565,9 @@ static void task_download(task_t *t, task_t *tracker_task)
 		if (strcmp(password, temp) != 0) //wrong password
 		  {
 		    printf("Incorrect encryption key. Please try again\n");
+		    //numWrong++;
+		    //if (numWrong == 3)
+		    //  return;
 		  }
 	      }
 	    printf("Encryption key verified\n"); //right password
