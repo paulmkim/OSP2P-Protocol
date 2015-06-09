@@ -845,7 +845,7 @@ int encrypt(char* filename)
     }
   
   //a: append
-  if ((encrypted = fopen("temporary_encrypt.jpg", "w+")) == NULL)
+  if ((encrypted = fopen("temporary_encrypt.jpg", "a")) == NULL)
     {
       error("* Could not open temperary file");
       return 0;
@@ -861,19 +861,22 @@ int encrypt(char* filename)
 
   do 
   {
-      temp = fgetc(original);
-      temp = temp^ENCRYPTIONKEY; //encrypt the byte using xor
+    temp = fgetc(original);
 
-      if (putc(temp, encrypted) == EOF)
-	{
-     	  error("* Failed to write in encrypted file");
-	  return 0;
-	}
+    //temp = temp^ENCRYPTIONKEY; //encrypt the byte using xor
+    //fputc(temp, encrypted);
+    
+    if (fputc(temp, encrypted) == EOF)
+      {
+	error("* Failed to write in encrypted file");
+	return 0;
+      }
   } while (temp != EOF);
+
   fclose(encrypted);
   
-  //remove(filename);
-  //rename("temporary_encrypt", filename);
+  remove(filename);
+  rename("temporary_encrypt.jpg", filename);
   return 1;
 }
 
