@@ -552,7 +552,7 @@ static void task_download(task_t *t, task_t *tracker_task)
 		goto try_again;
 	}
 	
-	int value = 0;
+	int correctpass = 0;
 	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
 	if (encrypt_mode != 0)
 	  {
@@ -571,7 +571,7 @@ static void task_download(task_t *t, task_t *tracker_task)
 		  }
 	      }
 	    printf("Encryption key verified\n"); //right password
-	    value = 1;
+	    correctpass = 1;
 	  }
 		    
 
@@ -646,7 +646,8 @@ static void task_download(task_t *t, task_t *tracker_task)
 		message("* Downloaded '%s' was %lu bytes long\n",
 			t->disk_filename, (unsigned long) t->total_written);
 
-		if (value == 1) //want to decrypt now
+		// got the correct password, so can download now
+		if (correctpass == 1) //want to decrypt
 		  {
 		    if (!encrypt(t->filename))
 		      {
@@ -654,6 +655,7 @@ static void task_download(task_t *t, task_t *tracker_task)
 			goto try_again;
 		      }
 		  }
+
 		// Inform the tracker that we now have the file,
 		// and can serve it to others!  (But ignore tracker errors.)
 		if (strcmp(t->filename, t->disk_filename) == 0) {
@@ -774,10 +776,7 @@ static void task_upload(task_t *t)
 	      {
 		error("* encrypt failed");
 		goto exit;
-	      }
-	  
-
-
+	      }	  
 	  }
 	
 	
@@ -837,34 +836,44 @@ int encrypt(char* filename)
   FILE *original;
   FILE *encrypted;
 
-  int temp;
+  char temp;
   //r+: read and update
   if ((original = fopen(filename, "r+")) == NULL)
     {
       error("* Could not open file %s to read", filename);
       return 0;
     }
+  
   //a: append
-  if ((encrypted = fopen("temperary_encrypt", "a")) == NULL)
+  if ((encrypted = fopen("temporary_encrypt.jpg", "w+")) == NULL)
     {
       error("* Could not open temperary file");
+      return 0;
     }
-
-  while (1)
+  
+  /*
+  if ((encrypted = fopen(filename, "w")) == NULL)
     {
+      error(" fuck this");
+      return 0;
+    }
+  */
+
+  do 
+  {
       temp = fgetc(original);
-      if (temp == EOF)
-	break;
       temp = temp^ENCRYPTIONKEY; //encrypt the byte using xor
 
-      if (fputc(temp, encrypted) == EOF)
+      if (putc(temp, encrypted) == EOF)
 	{
-	  error("* Failed to write in encrypted file");
+     	  error("* Failed to write in encrypted file");
 	  return 0;
 	}
-    }
-  remove(filename);
-  rename("temperary_encrypt", filename);
+  } while (temp != EOF);
+  fclose(encrypted);
+  
+  //remove(filename);
+  //rename("temporary_encrypt", filename);
   return 1;
 }
 
