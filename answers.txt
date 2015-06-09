@@ -54,12 +54,14 @@ entire disk space (by comparing to MAXFILESIZ)
 
 1. Caused a buffer overflow by using strncpy and writing over three times the
 size of memory allocated for filename. This will wrote over other variable's
-memory.
+memory. (run by using the -b option)
 2. Caused a disk overrun by repeatedly uploading data to the peer. To do this,
 we just reset the file pointer to point to the beginning of the file whenever it
-reached the end of file to ocntinuously upload data.
+reached the end of file to ocntinuously upload data. (run by using the -z
+option) 
 
 # Extra credit problems
 #Extra credit problem: none
 
 # Add any other information you'd like us to know below this line.
+To run the second attack option, we added a -z option that sets evil-mode to 2.

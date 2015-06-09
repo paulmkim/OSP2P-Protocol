@@ -531,7 +531,7 @@ static void task_download(task_t *t, task_t *tracker_task)
 	    error("* Name too long");
 	    goto try_again;
 	  }
-	
+
 	// Quit if no peers, and skip this peer
 	if (!t || !t->peer_list) {
 		error("* No peers are willing to serve '%s'\n",
@@ -551,7 +551,7 @@ static void task_download(task_t *t, task_t *tracker_task)
 		error("* Cannot connect to peer: %s\n", strerror(errno));
 		goto try_again;
 	}
-
+	
 	int value = 0;
 	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
 	if (encrypt_mode != 0)
@@ -574,8 +574,6 @@ static void task_download(task_t *t, task_t *tracker_task)
 	    value = 1;
 	  }
 		    
-
-	
 
 	if (evil_mode == 1)
 	  {
@@ -932,6 +930,10 @@ int main(int argc, char *argv[])
 		goto argprocess;
 	} else if (argc >= 2 && strcmp(argv[1], "-b") == 0) {
 		evil_mode = 1;
+		--argc, ++argv;
+		goto argprocess;
+	} else if (argc >= 2 && strcmp(argv[1], "-z") == 0) {
+		evil_mode = 2;
 		--argc, ++argv;
 		goto argprocess;
 	}
